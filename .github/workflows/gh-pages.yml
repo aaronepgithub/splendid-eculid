@@ -8,8 +8,9 @@ on:
 # IMPORTANT: Permissions at the top‑level
 # -------------------------------------------------
 permissions:
-  contents: write   # needed to push the gh‑pages branch
-  pages: write      # needed to publish the site
+  contents: write      # needed to push the gh-pages branch
+  pages: write         # needed to publish the site
+  id-token: write      # needed for OIDC token generation in deploy-pages
 
 jobs:
   build-and-deploy:
