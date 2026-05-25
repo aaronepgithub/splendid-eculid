@@ -1,45 +1,57 @@
 name: Deploy to GitHub Pages
-
 on:
   push:
     branches:
-      - main
-      # you can also trigger on master if your default branch is named master
+      - main                     # run on every push to main
+
+# -------------------------------------------------
+# IMPORTANT: Permissions at the top‑level
+# -------------------------------------------------
 permissions:
-  contents: write
-  pages: write
-  
+  contents: write   # needed to push the gh‑pages branch
+  pages: write      # needed to publish the site
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
+      # ---------- Checkout ----------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0         # get full history for gh‑pages push
 
+      # ---------- Node ----------
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
 
+      # ---------- Install ----------
       - name: Install dependencies
         run: |
-          npm ci --no-audit --no-fund || (rm -rf node_modules package-lock.json && npm cache clean --force && npm install --no-audit --no-fund)
+          npm ci --no-audit --no-fund ||
+          (rm -rf node_modules package-lock.json && npm cache clean --force && npm install --no-audit --no-fund)
 
+      # ---------- Build ----------
       - name: Build project
         run: npm run build
 
-      - name: Set up Git user
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      # ---------- Upload artifact ----------
+      # This puts the `dist/` folder into a temporary artifact that the
+      # `upload-pages-artifact` step can later publish.
+      - name: Upload build artifact
+        uses: actions/upload-pages-artifact@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          # optional: keep only the latest commit on gh-pages branch
-          force_orphan: true
+          path: ./dist
+
+      # ---------- Configure pages ----------
+      # Informs GitHub that the next step will publish to Pages.
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v4
+
+      # ---------- Deploy ----------
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v3
+        # No extra inputs needed – the artifact from the previous step is used.
