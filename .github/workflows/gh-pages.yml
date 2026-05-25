@@ -39,19 +39,15 @@ jobs:
         run: npm run build
 
       # ---------- Upload artifact ----------
-      # This puts the `dist/` folder into a temporary artifact that the
-      # `upload-pages-artifact` step can later publish.
       - name: Upload build artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3  # Update from v2 to v3
         with:
           path: ./dist
 
       # ---------- Configure pages ----------
-      # Informs GitHub that the next step will publish to Pages.
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5  # Update from v4 to v5
 
       # ---------- Deploy ----------
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v3
-        # No extra inputs needed – the artifact from the previous step is used.
+        uses: actions/deploy-pages@v4  # Update from v3 to v4
