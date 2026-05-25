@@ -5,7 +5,10 @@ on:
     branches:
       - main
       # you can also trigger on master if your default branch is named master
-
+permissions:
+  contents: write
+  pages: write
+  
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
