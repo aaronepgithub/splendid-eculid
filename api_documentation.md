@@ -11,6 +11,16 @@ Most API endpoints now automatically trigger a **Just-In-Time (JIT)** processing
 
 ---
 
+## 0. Added Bike Comparison to API
+**Endpoint:** 'GET /api/v1/bike-comparison'
+
+def api_v1_bike_comparison():
+    try:
+        data = generate_bike_comparison_data()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 ## 1. Segment Report
 **Endpoint:** `GET /api/v1/segment-report`
 
