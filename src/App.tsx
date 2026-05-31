@@ -728,35 +728,49 @@ function PowerProfileView({ activities, athleteProfile, athleteWeight }: PowerPr
       if (act.best_5s) powerByMonth[month].p5s.push(act.best_5s);
       if (act.best_30s) powerByMonth[month].p30s.push(act.best_30s);
       if (act.best_5min) powerByMonth[month].p5m.push(act.best_5min);
-      if (act.best_20min) powerByMonth[month].p20m.push(act.best_20min);
+      
+      if (act.best_20min) {
+        powerByMonth[month].p20m.push(act.best_20min);
+      } else if (act.average_watts && act.average_watts > 100) {
+        // Fallback: estimate 20min peak from average watts
+        powerByMonth[month].p20m.push(act.average_watts * 1.05);
+      }
     });
 
     const parsedHistory = Object.entries(powerByMonth)
       .map(([month, powers]) => {
-        const peak5 = powers.p5s.length > 0 ? Math.max(...powers.p5s) : 0;
-        const peak30 = powers.p30s.length > 0 ? Math.max(...powers.p30s) : 0;
-        const peak5min = powers.p5m.length > 0 ? Math.max(...powers.p5m) : 0;
-        const peak20min = powers.p20m.length > 0 ? Math.max(...powers.p20m) : 0;
+        let peak5 = powers.p5s.length > 0 ? Math.max(...powers.p5s) : 0;
+        let peak30 = powers.p30s.length > 0 ? Math.max(...powers.p30s) : 0;
+        let peak5min = powers.p5m.length > 0 ? Math.max(...powers.p5m) : 0;
+        let peak20min = powers.p20m.length > 0 ? Math.max(...powers.p20m) : 0;
+
+        // Cascade estimates if we only have 20m peak
+        if (peak20min > 0) {
+          if (peak5min === 0) peak5min = peak20min * 1.15;
+          if (peak30 === 0) peak30 = peak5min * 1.6;
+          if (peak5 === 0) peak5 = peak30 * 1.8;
+        }
+
         return {
           month: month.split('-').reverse().join('/'),
-          peak5s: peak5,
-          peak30s: peak30,
-          peak5m: peak5min,
-          peak20m: peak20min
+          peak5s: peak5 > 0 ? peak5 : null,
+          peak30s: peak30 > 0 ? peak30 : null,
+          peak5m: peak5min > 0 ? peak5min : null,
+          peak20m: peak20min > 0 ? peak20min : null
         };
       })
       // filter out months with insufficient data
-      .filter(item => item.peak5s > 0 || item.peak5m > 0)
+      .filter(item => item.peak5s !== null || item.peak5m !== null || item.peak20m !== null)
       .sort((a, b) => a.month.localeCompare(b.month));
 
     setPowerHist(parsedHistory);
   }, [activities]);
 
   // Compute power curves to show current capacity (best across all activities)
-  const max5s = activities.reduce((max, a) => (a.best_5s || 0) > max ? a.best_5s || 0 : max, 0);
-  const max30s = activities.reduce((max, a) => (a.best_30s || 0) > max ? a.best_30s || 0 : max, 0);
-  const max5m = activities.reduce((max, a) => (a.best_5min || 0) > max ? a.best_5min || 0 : max, 0);
-  const max20m = activities.reduce((max, a) => (a.best_20min || 0) > max ? a.best_20min || 0 : max, 0);
+  const max5s = powerHist.length > 0 ? Math.max(...powerHist.map(h => h.peak5s || 0)) : 0;
+  const max30s = powerHist.length > 0 ? Math.max(...powerHist.map(h => h.peak30s || 0)) : 0;
+  const max5m = powerHist.length > 0 ? Math.max(...powerHist.map(h => h.peak5m || 0)) : 0;
+  const max20m = powerHist.length > 0 ? Math.max(...powerHist.map(h => h.peak20m || 0)) : 0;
 
   // Power to weight ratio comparisons (standard Coggan categories)
   const wkg5s = max5s / athleteWeight;
@@ -821,20 +835,25 @@ function PowerProfileView({ activities, athleteProfile, athleteWeight }: PowerPr
         </p>
 
         <div className="chart-container" style={{ height: '360px' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={powerHist} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} unit="W" />
-              <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', borderRadius: '12px', color: 'white' }} />
-              <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px', fontWeight: 600 }} />
-              
-              {max5s > 0 && <Line type="monotone" dataKey="peak5s" name="Sprint (5s)" stroke="var(--brand-orange)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls={true} />}
-              {max30s > 0 && <Line type="monotone" dataKey="peak30s" name="Anaerobic (30s)" stroke="var(--brand-purple)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls={true} />}
-              {max5m > 0 && <Line type="monotone" dataKey="peak5m" name="VO2 Max (5m)" stroke="var(--brand-blue)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls={true} />}
-              {max20m > 0 && <Line type="monotone" dataKey="peak20m" name="Threshold (20m)" stroke="var(--brand-gold)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls={true} />}
-            </LineChart>
-          </ResponsiveContainer>
+          {powerHist.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={powerHist} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.15)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} unit="W" />
+                <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', borderRadius: '12px', color: 'white' }} />
+                <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px', fontWeight: 600 }} />
+                <Line type="monotone" dataKey="peak5s" name="Sprint (5s)" stroke="var(--brand-orange)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls={true} />
+                <Line type="monotone" dataKey="peak30s" name="Anaerobic (30s)" stroke="var(--brand-purple)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls={true} />
+                <Line type="monotone" dataKey="peak5m" name="VO2 Max (5m)" stroke="var(--brand-blue)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls={true} />
+                <Line type="monotone" dataKey="peak20m" name="Threshold (20m)" stroke="var(--brand-gold)" strokeWidth={2.5} dot={{ r: 4 }} connectNulls={true} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+              No power data available. Please ensure your activities contain power meter data.
+            </div>
+          )}
         </div>
       </div>
 
